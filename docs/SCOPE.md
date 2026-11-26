@@ -1,6 +1,6 @@
 # Périmètre — trafficBot (Systèmes intelligents autonomes)
 
-Un TurtleBot3 Burger équipé d'une caméra suit un circuit routier miniature et respecte en temps réel le code de la route : stop (arrêt 3 s), sens interdit, cul-de-sac (demi-tour) et feu tricolore connecté. Ce repo couvre la chaîne ROS2 perception → décision → commande, validée dans Gazebo puis sur le robot réel.
+Un TurtleBot3 Burger équipé d'une caméra suit un circuit routier miniature et respecte en temps réel le code de la route : stop (arrêt 3 s), sens interdit, panneaux d'interdictions de tourner à gauche et à droite, et feu tricolore connecté. Bloqué par un mur, il fait demi-tour. Ce repo couvre la chaîne ROS2 perception → décision → commande, validée dans Gazebo puis sur le robot réel.
 
 Le modèle de détection des panneaux est produit par le repo jumeau [`trafficbot-model`](https://github.com/Loren844/trafficbot-model) (cours Edge AI). Ce repo l'utilise sans le modifier.
 
@@ -25,10 +25,10 @@ Toute la chaîne embarquée (suivi du chemin, détection des panneaux, FSM) doit
 
 ## Inclus (obligatoire)
 
-1. **Monde Gazebo du circuit** : route avec lignes au sol, une intersection, une impasse, modèles 3D des panneaux et du feu.
+1. **Monde Gazebo du circuit** : route avec lignes au sol, au moins une intersection, une voie fermée par un mur, modèles 3D des panneaux (stop, sens interdit, interdit à gauche, interdit à droite) et du feu.
 2. **Suivi du chemin** par vision classique (OpenCV) avec un régulateur PID sur l'écart au centre, publié sur `/cmd_vel`. La méthode dépend du support physique choisi (voir « Décision ouverte »).
 3. **Nœud de détection** qui charge le modèle publié par `trafficbot-model` et publie les panneaux détectés.
-4. **Machine à états de décision** : `SUIVRE`, `ARRET_STOP` (3 s puis repart), `ATTENTE_FEU`, `DEMI_TOUR` (cul-de-sac), `EVITER` (sens interdit : ne pas s'engager, prendre l'autre branche).
+4. **Machine à états de décision** : `SUIVRE`, `ARRET_STOP` (3 s puis repart), `ATTENTE_FEU` (arrêt au rouge, repart au vert), `CHOIX_BRANCHE` (à l'intersection, exclure les branches interdites par `sens_interdit`, `interdit_gauche` ou `interdit_droite`), `DEMI_TOUR` (mur détecté devant le robot par le LiDAR).
 5. **Feu tricolore connecté** : nœud qui publie l'état du feu sur un topic ROS2 (simulé dans Gazebo, puis vrai feu piloté par une carte sur le même réseau DDS).
 6. **Portage sur le robot réel** : circuit physique selon l'option retenue, panneaux imprimés, mêmes nœuds et mêmes topics qu'en simulation.
 7. **Launch files** : un pour la simulation, un pour le robot réel.
@@ -51,6 +51,7 @@ Recommandation : partir sur l'option 1 tout de suite (ou l'option 4 si le checkp
 - Passage piéton : ralentir (vitesse réduite de 50 % pendant la traversée).
 - Checkpoint à rejoindre : choix de branche aux intersections, ou Nav2 + carte Cartographer.
 - Arrêt d'urgence sur obstacle avec le LiDAR du Burger.
+- Feu orange : état `orange` du feu connecté, traité comme un rouge.
 - Visualisation Foxglove ou RViz des détections et de l'état de la FSM.
 
 ## Exclus
@@ -64,12 +65,12 @@ Recommandation : partir sur l'option 1 tout de suite (ou l'option 4 si le checkp
 
 | Élément | Contrat | Produit par | Utilisé par |
 | --- | --- | --- | --- |
-| Classes | `stop`, `sens_interdit`, `cul_de_sac`, `feu_rouge`, `feu_orange`, `feu_vert`, `passage_pieton` (optionnel) | décidé ensemble | les deux repos |
+| Classes | `stop`, `sens_interdit`, `interdit_gauche`, `interdit_droite`, `feu_rouge`, `feu_vert` ; `passage_pieton` en option | décidé ensemble ([BENCHMARK.md](https://github.com/Loren844/trafficbot-model/blob/main/docs/BENCHMARK.md)) | les deux repos |
 | Modèle | `model.onnx` + `model_int8.tflite` + `labels.txt`, en release GitHub versionnée de `trafficbot-model` | trafficbot-model | nœud de détection |
 | Entrée | image RGB 320×320, prétraitement défini dans un `preprocess.py` partagé | trafficbot-model | nœud de détection |
 | Caméra | `/camera/image_raw` (`sensor_msgs/Image`) | Gazebo ou caméra réelle | détecteur, enregistrement du dataset |
 | Détections | `/traffic/detections` (`vision_msgs/Detection2DArray`) | nœud de détection | FSM |
-| Feu connecté | `/traffic_light/state` (`std_msgs/String` : `rouge`, `orange`, `vert`) | carte du feu | FSM |
+| Feu connecté | `/traffic_light/state` (`std_msgs/String` : `rouge`, `vert` ; `orange` en option) | carte du feu | FSM |
 | Latence | p95 < 100 ms capture → détection sur le Pi 4 du robot | vérifié par le benchmark | dimensionne la vitesse |
 | Données | rosbags enregistrés en simulation et sur le circuit réel | ce repo | dataset de trafficbot-model |
 
@@ -81,24 +82,11 @@ Le benchmark de `trafficbot-model` tranche une question de ce repo : exécuter l
 - Vidéo du scénario complet en simulation, puis sur le robot réel.
 - Rendus d'évaluation de la matière (rapport, soutenance) : **à confirmer**, le support d'introduction du cours n'a pas pu être lu.
 
-## Jalons
-
-Calés sur les revues hebdomadaires du cours Edge AI ; dates propres à Systèmes intelligents à ajouter.
-
-| Date | Jalon |
-| --- | --- |
-| 25/11/2026 | Périmètre validé, contrat d'interface figé, ROS2 Humble installé par tous |
-| 02/12/2026 | Méthode de détection du chemin choisie, monde Gazebo du circuit, suivi du chemin en simulation |
-| 09/12/2026 | Nœud de détection branché sur un modèle provisoire |
-| 16/12/2026 | FSM complète en simulation (stop, feu, sens interdit, cul-de-sac) |
-| 06/01/2027 | Robot réel sur le circuit physique, feu connecté |
-| 13/01/2027 | Scénario complet filmé, options si le temps le permet |
-| 20/01/2027 | Démo intégrée |
-
 ## Risques et questions ouvertes
 
 - Écart simulation / réel (éclairage, couleurs des lignes) : seuils paramétrables, dataset mixte.
-- Rouge et orange confondus par la vision : le topic du feu connecté fait foi.
+- Gauche et droite confondues par la vision (panneaux symétriques) : le modèle est entraîné sans retournement horizontal.
+- Rouge et vert confondus par la vision : le topic du feu connecté fait foi.
 - Pi 4 du robot trop lent : INT8, résolution réduite ou inférence déportée sur PC.
 - [ ] Dates et forme des rendus de la matière ?
 - [ ] Méthode de détection du chemin (voir « Décision ouverte ») ?

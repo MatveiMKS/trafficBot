@@ -2,7 +2,7 @@
 
 Projet du cours Systèmes intelligents autonomes (Polytech, 2026-2027).
 
-Un TurtleBot3 Burger suit un circuit routier miniature et applique quatre règles : stop (arrêt de 3 s), sens interdit, cul-de-sac (demi-tour) et feu tricolore connecté. Le code est développé avec ROS2, testé dans Gazebo, puis exécuté sur le robot.
+Un TurtleBot3 Burger suit un circuit routier miniature et applique ces règles : stop (arrêt de 3 s), sens interdit, panneaux d'interdictions de tourner à gauche et à droite, feu tricolore connecté, et demi-tour quand un mur bloque la voie. Le code est développé avec ROS2, testé dans Gazebo, puis exécuté sur le robot.
 
 Le modèle de détection des panneaux vient du dépôt [trafficbot-model](https://github.com/Loren844/trafficbot-model) (cours Edge AI).
 
@@ -32,7 +32,7 @@ export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
 | --- | --- | --- |
 | `/camera/image_raw` | `sensor_msgs/Image` | image de la caméra |
 | `/traffic/detections` | `vision_msgs/Detection2DArray` | panneaux et feux détectés |
-| `/traffic_light/state` | `std_msgs/String` | état du feu connecté (`rouge`, `orange`, `vert`) |
+| `/traffic_light/state` | `std_msgs/String` | état du feu connecté (`rouge`, `vert`) |
 | `/cmd_vel` | `geometry_msgs/Twist` | commande de vitesse |
 
 ## Documentation
